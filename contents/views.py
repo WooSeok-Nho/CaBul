@@ -6,7 +6,13 @@ from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
 from django.views.generic import ListView, TemplateView
 from django.db.models import Q
+
+# import torch
+# import cv2
+from users.models import User
+
 from .classification import update_category, upload_category
+
 
 
 # 게시글 업로드
@@ -44,6 +50,8 @@ def post_detail(request, id):
     feed = Feed.objects.all().order_by('-created_at')
     feed_count_all = len(feed)
 
+    user_feed = Feed.objects.filter(user_id=request.user.id)
+    user_feed_count = len(user_feed)
 
     feed_cate = Feed.objects.all().order_by('-category')
     feed_category_all = feed_cate.values_list('category', flat=True)
@@ -61,12 +69,16 @@ def post_detail(request, id):
 
     same_feed_categorys = Feed.objects.filter(category=my_feed.category)
 
+    user_list = User.objects.all().exclude(id=request.user.id)
+
     context = {
         'feeds':my_feed,
         'comments': comment,
         'feed_count_all':feed_count_all,
         'categorys' : feed_categorys,
-        'same_feed_categorys' :same_feed_categorys
+        'same_feed_categorys' : same_feed_categorys,
+        'user_feed_count' : user_feed_count,
+        'user_list' : user_list
     }
     return render(request, 'index.html', context)
 # 게시글 삭제
@@ -144,6 +156,9 @@ def search(request):
     feed = Feed.objects.all().order_by('-created_at')
     feed_count_all = len(feed)
 
+    user_feed = Feed.objects.filter(user_id=request.user.id)
+    user_feed_count = len(user_feed)
+
     feed_cate = Feed.objects.all().order_by('-category')
     feed_category_all = feed_cate.values_list('category', flat=True)
     feed_category = feed_cate.values_list('category', flat=True).distinct()
@@ -162,7 +177,8 @@ def search(request):
         'searched':searched,
         'q': q,
         'feed_count_all':feed_count_all,
-        'categorys' : feed_categorys
+        'categorys' : feed_categorys,
+        'user_feed_count' : user_feed_count
         }
     return render(request, 'search.html', context)
 
@@ -189,6 +205,20 @@ def delete_comment(request, feed_id):
             return redirect('contents:post_detail', id)
         else:
             return HttpResponse('권한이 없습니다!')
+
+
+@login_required(login_url='users:login')
+def likes(request, id):
+    if request.method == 'POST': #요청이 post로 왔다면 아래 if문
+        post = Feed.objects.get(id=id)#id값과 post에서 받아온 데이터와 같은 친구를 불러오겠다.
+        									#그 친구를 post에 저장
+        
+    if post.like_authors.filter(id=request.user.id).exists():#post에 id=request.user.id가 있다면 True, 없으면 False로 분기문 탈출
+        post.like_authors.remove(request.user) #있다면 remove로 제거
+        
+    else:
+        post.like_authors.add(request.user)	#add로 추가
+    return redirect(request.META['HTTP_REFERER'])
 
 
 
